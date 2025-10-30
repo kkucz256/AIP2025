@@ -1,0 +1,29 @@
+seed: 42
+data_dir: data/mvtec_ad
+artifacts_dir: artifacts
+reports_dir: reports
+category: bottle
+image_size: 256
+batch_size: 8
+num_workers: 2
+padim:
+  selected_channels: 100
+  gaussian_kernel: 5
+  blur_sigma: 1.0
+cae:
+  base_channels: 32
+  latent_channels: 256
+  learning_rate: 0.001
+  weight_decay: 0.0
+  batch_size: 16
+  epochs: 30
+  loss_mse_weight: 0.85
+  loss_ssim_weight: 0.15
+evaluation:
+  percentile_threshold: 0.9
+app:
+  api_host: 0.0.0.0
+  api_port: 8000
+  ui_host: 0.0.0.0
+  ui_port: 7860
+  max_fps: 8
