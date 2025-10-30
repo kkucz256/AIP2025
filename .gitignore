@@ -3,3 +3,34 @@ node_modules/
 *.log
 .env
 AGENTS.md
+GEMINI.md
+./kaggle/
+.venv
+mvtec-vqi\data\mvtec_ad/
+mvtec-vqi\data\splits/
+# Ignorowanie środowiska wirtualnego
+.venv/
+
+# Ignorowanie ustawień edytora VS Code
+.vscode/
+
+# Ignorowanie folderów z danymi
+data/mvtec_ad/
+data/splits/
+
+# Środowisko wirtualne (jeśli jest w głównym folderze)
+.venv/
+
+# Ustawienia VS Code (jeśli są w głównym folderze)
+.vscode/
+
+# --- Poprawne ścieżki do folderów z danymi ---
+mvtec-vqi/data/mvtec_ad/
+mvtec-vqi/data/splits/
+
+# --- Inne pliki do ignorowania (z Twojego 'git status') ---
+mvtec-vqi/artifacts/
+
+# Uniwersalna reguła dla cache'u Pythona
+**/__pycache__/
+*.pyc

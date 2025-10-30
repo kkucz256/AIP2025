@@ -23,7 +23,7 @@ def main():
     if dataset_dir.exists():
         print(f"Dane już istnieją w {dataset_dir}")
         return
-    env_home = Path(os.getenv("HOME", ""))
+    env_home = Path.home()
     kaggle_token = env_home / ".kaggle" / "kaggle.json"
     if not kaggle_token.exists():
         raise RuntimeError("Brak pliku ~/.kaggle/kaggle.json dla API Kaggle")

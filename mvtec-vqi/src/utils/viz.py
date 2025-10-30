@@ -28,6 +28,10 @@ def overlay_heatmap(image, heatmap, alpha):
     return cv2.addWeighted(image, 1.0 - alpha, heatmap, alpha, 0)
 
 
+def resize_image(image, width, height):
+    return cv2.resize(image, (width, height), interpolation=cv2.INTER_LINEAR)
+
+
 def encode_png_base64(image):
     success, buffer = cv2.imencode(".png", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
     if not success:

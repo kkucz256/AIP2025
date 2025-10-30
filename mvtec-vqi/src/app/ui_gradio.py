@@ -45,8 +45,12 @@ def call_api(image, backend, category, api_url):
 
 def prepare_overlay(image, heatmap, amap, threshold):
     threshold = float(max(0.0, min(1.0, threshold)))
-    resized_heatmap = heatmap
-    resized_map = amap
+    
+    # Resize heatmap and amap to match the input image dimensions
+    target_height, target_width = image.shape[0], image.shape[1]
+    resized_heatmap = viz.resize_image(heatmap, target_width, target_height)
+    resized_map = viz.resize_image(amap, target_width, target_height)
+    
     mask = (resized_map >= threshold).astype(np.uint8)
     mask_rgb = np.repeat(mask[:, :, None], 3, axis=2)
     focused_heatmap = resized_heatmap.copy()
