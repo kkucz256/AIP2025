@@ -1,0 +1,9 @@
+{
+  "backend": "padim_resnet50",
+  "category": "bottle",
+  "image_auroc": 0.6150793650793651,
+  "pixel_auroc": 0.9503506860203227,
+  "dice_otsu": 0.4801985256819175,
+  "dice_percent": 0.4231384433092584,
+  "threshold_percentile": 0.9
+}
