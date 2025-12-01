@@ -55,14 +55,28 @@ class TerminalApp:
             "category": self.config.get("category", "bottle"),
             "image_path": None,
         }
-        self.params = {
-            "threshold": float(self.config.get("infer", {}).get("threshold", 0.55)),
-            "score_percentile": float(self.config.get("infer", {}).get("score_percentile", 0.9)),
+        self.backend_params: Dict[str, Dict[str, float]] = {
+            "padim_resnet50": self._backend_defaults("padim_resnet50"),
+            "cae": self._backend_defaults("cae"),
+        }
+        self.common_params = {
             "save_overlay": bool(self.config.get("infer", {}).get("save_overlay", True)),
             "overlay_dir": resolve_path(self.config.get("infer", {}).get("overlay_dir", "reports/overlays_cli")),
-            "gaussian_kernel": self.config["padim"]["gaussian_kernel"],
-            "blur_sigma": self.config["padim"]["blur_sigma"],
         }
+
+    def _backend_defaults(self, backend: str) -> Dict[str, float]:
+        infer_cfg = self.config.get("infer", {})
+        backend_cfg = infer_cfg.get("backend_defaults", {}).get(backend, {})
+        threshold = backend_cfg.get("threshold", infer_cfg.get("threshold", 0.55))
+        percentile = backend_cfg.get("score_percentile", infer_cfg.get("score_percentile", 0.9))
+        params = {
+            "threshold": float(threshold),
+            "score_percentile": float(percentile),
+        }
+        if backend == "padim_resnet50":
+            params["gaussian_kernel"] = self.config["padim"]["gaussian_kernel"]
+            params["blur_sigma"] = self.config["padim"]["blur_sigma"]
+        return params
 
     def run(self):
         while True:
@@ -87,7 +101,8 @@ class TerminalApp:
                 image_label = str(Path(self.state["image_path"]).relative_to(self.data_root))
             except Exception:
                 image_label = str(self.state["image_path"])
-        summary = f"prog={self.params['threshold']:.2f}, perc={self.params['score_percentile']:.2f}"
+        params = self.backend_params[self.state["backend"]]
+        summary = f"prog={params['threshold']:.2f}, perc={params['score_percentile']:.2f}"
         options = [
             (f"1. Wybor modelu ({self.state['backend']})", "model"),
             (f"2. Wybor zdjecia ({image_label})", "image"),
@@ -139,16 +154,19 @@ class TerminalApp:
             return []
         return sorted([d for d in self.data_root.iterdir() if d.is_dir()])
 
-    def _list_images(self, category: Path):
+    def _list_images(self, base: Path):
         images = []
-        base = category
-        for path in sorted(base.rglob("*")):
+        for path in sorted(base.glob("*")):
             if path.suffix.lower() not in IMAGE_EXTENSIONS:
-                continue
-            if "ground_truth" in path.parts and path.stem.endswith("_mask"):
                 continue
             images.append(path)
         return images
+
+    def _list_defect_types(self, category_path: Path):
+        test_root = category_path / "test"
+        if not test_root.exists():
+            return []
+        return [d for d in sorted(test_root.iterdir()) if d.is_dir()]
 
     def choose_image(self):
         if not self.data_root.exists():
@@ -167,7 +185,19 @@ class TerminalApp:
         )
         if not category or category == "__back__":
             return
-        images = self._list_images(category)
+        defect_types = self._list_defect_types(category)
+        if not defect_types:
+            input("Brak podfolderow w test/. Enter aby wrocic.")
+            return
+        type_options = [(dt.name, dt) for dt in defect_types]
+        type_options.append(("Cofnij", "__back__"))
+        defect_type = select_option(
+            "Wybierz typ (test/...)",
+            type_options,
+        )
+        if not defect_type or defect_type == "__back__":
+            return
+        images = self._list_images(defect_type)
         if not images:
             input("Brak obrazow w wybranej kategorii. Enter aby wrocic.")
             return
@@ -181,7 +211,7 @@ class TerminalApp:
 
     def _select_image_with_pagination(self, images):
         page_size = 15
-        items = [(str(path.relative_to(self.data_root)), path) for path in images]
+        items = [(path.name, path) for path in images]
         total_pages = max(1, (len(items) + page_size - 1) // page_size)
         page = 0
         current = self.state.get("image_path")
@@ -212,16 +242,24 @@ class TerminalApp:
 
     def configure_params(self):
         while True:
-            overlay_state = "ON" if self.params["save_overlay"] else "OFF"
+            params = self.backend_params[self.state["backend"]]
+            overlay_state = "ON" if self.common_params["save_overlay"] else "OFF"
             options = [
-                (f"Prog klasyfikacji (aktualnie {self.params['threshold']:.2f})", "threshold"),
-                (f"Percentyl mapy anomalii (aktualnie {self.params['score_percentile']:.2f})", "percentile"),
-                (f"Wygladzanie PaDiM kernel={self.params['gaussian_kernel']} sigma={self.params['blur_sigma']}", "smoothing"),
-                (f"Zapis zrzutow {overlay_state}", "overlay"),
-                (f"Urzadzenie: {self.device}", "device"),
-                ("Instrukcje parametrow", "__help__"),
-                ("Cofnij", "__back__"),
+                (f"Prog klasyfikacji (aktualnie {params['threshold']:.2f})", "threshold"),
+                (f"Percentyl mapy anomalii (aktualnie {params['score_percentile']:.2f})", "percentile"),
             ]
+            if self.state["backend"] == "padim_resnet50":
+                options.append(
+                    (f"Wygladzanie PaDiM kernel={params['gaussian_kernel']} sigma={params['blur_sigma']}", "smoothing")
+                )
+            options.extend(
+                [
+                    (f"Zapis zrzutow {overlay_state}", "overlay"),
+                    (f"Urzadzenie: {self.device}", "device"),
+                    ("Instrukcje parametrow", "__help__"),
+                    ("Cofnij", "__back__"),
+                ]
+            )
             selection = select_option("Parametry analizy", options)
             if selection in (None, "__back__"):
                 return
@@ -229,17 +267,17 @@ class TerminalApp:
                 self._show_params_help()
                 continue
             if selection == "threshold":
-                self.params["threshold"] = prompt_float("Podaj nowy prog anomalii (0-1)", self.params["threshold"])
+                params["threshold"] = prompt_float("Podaj nowy prog anomalii (0-1)", params["threshold"])
             elif selection == "percentile":
-                value = prompt_float("Percentyl do obliczenia wyniku (0-1)", self.params["score_percentile"])
-                self.params["score_percentile"] = min(max(value, 0.0), 1.0)
-            elif selection == "smoothing":
-                self.params["gaussian_kernel"] = int(
-                    prompt_float("Rozmiar jadra Gaussa dla PaDiM (nieparzyste)", self.params["gaussian_kernel"])
+                value = prompt_float("Percentyl do obliczenia wyniku (0-1)", params["score_percentile"])
+                params["score_percentile"] = min(max(value, 0.0), 1.0)
+            elif selection == "smoothing" and self.state["backend"] == "padim_resnet50":
+                params["gaussian_kernel"] = int(
+                    prompt_float("Rozmiar jadra Gaussa dla PaDiM (nieparzyste)", params["gaussian_kernel"])
                 )
-                self.params["blur_sigma"] = prompt_float("Sigma Gaussa dla PaDiM", self.params["blur_sigma"])
+                params["blur_sigma"] = prompt_float("Sigma Gaussa dla PaDiM", params["blur_sigma"])
             elif selection == "overlay":
-                self.params["save_overlay"] = not self.params["save_overlay"]
+                self.common_params["save_overlay"] = not self.common_params["save_overlay"]
             elif selection == "device":
                 self.device = self._choose_device()
                 self.cache.clear()
@@ -278,9 +316,9 @@ class TerminalApp:
         return np.array(image)
 
     def _save_visuals(self, overlay, heatmap, source_path: Path):
-        if not self.params["save_overlay"]:
+        if not self.common_params["save_overlay"]:
             return None, None
-        out_dir = Path(self.params["overlay_dir"])
+        out_dir = Path(self.common_params["overlay_dir"])
         out_dir.mkdir(parents=True, exist_ok=True)
         overlay_path = out_dir / "overlay.png"
         heatmap_path = out_dir / "heatmap.png"
@@ -294,6 +332,7 @@ class TerminalApp:
             return
         backend = self.state["backend"]
         category = self.state["category"]
+        params = self.backend_params[backend]
         try:
             predictor = self.cache.get(backend, category, self.device)
         except Exception as exc:
@@ -307,22 +346,22 @@ class TerminalApp:
         blur_override = None
         if backend == "padim_resnet50":
             blur_override = {
-                "gaussian_kernel": self.params["gaussian_kernel"],
-                "blur_sigma": self.params["blur_sigma"],
+                "gaussian_kernel": params["gaussian_kernel"],
+                "blur_sigma": params["blur_sigma"],
             }
         result = predictor.predict_array(
             image_array,
-            score_percentile=self.params["score_percentile"],
+            score_percentile=params["score_percentile"],
             blur_override=blur_override,
         )
         score = result["score"]
-        is_anomaly = score >= self.params["threshold"]
+        is_anomaly = score >= params["threshold"]
         overlay_path, heatmap_path = self._save_visuals(result["overlay"], result["heatmap"], Path(self.state["image_path"]))
         clear_screen()
         status = "DEFEKT" if is_anomaly else "OK"
         print("=== Wynik analizy ===")
         print(f"Model: {backend} | Kategoria: {category} | Urzadzenie: {self.device}")
-        print(f"Wynik: {score:.4f}  | Prog: {self.params['threshold']:.4f}  | Klasyfikacja: {status}")
+        print(f"Wynik: {score:.4f}  | Prog: {params['threshold']:.4f}  | Klasyfikacja: {status}")
         if overlay_path:
             print(f"Overlay zapisany w: {overlay_path}")
             print(f"Mapa cieplna zapisana w: {heatmap_path}")

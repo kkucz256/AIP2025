@@ -67,12 +67,13 @@ class CAEModel:
         return ssim.mean(dim=1, keepdim=True)
 
     def _normalize_map(self, amap):
-        min_val = amap.amin(dim=(2, 3), keepdim=True)
-        max_val = amap.amax(dim=(2, 3), keepdim=True)
+        min_val = amap.min()
+        max_val = amap.max()
         return (amap - min_val) / (max_val - min_val + 1e-8)
 
     def fit(self, train_loader, val_loader=None, epochs=30):
-        scaler = torch.cuda.amp.GradScaler(enabled=self.device.type == "cuda" and self.config.get("use_amp", True))
+        amp_enabled = self.device.type == "cuda" and self.config.get("use_amp", True)
+        scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
         optimizer = Adam(self.model.parameters(), lr=self.config["learning_rate"], weight_decay=self.config["weight_decay"])
         best_loss = float("inf")
         best_state = None
@@ -83,7 +84,7 @@ class CAEModel:
                 images = batch[0] if isinstance(batch, (list, tuple)) else batch
                 images = images.to(self.device)
                 optimizer.zero_grad()
-                with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):
+                with torch.autocast(device_type=self.device.type, enabled=scaler.is_enabled()):
                     recon = self.model(images)
                     mse = F.mse_loss(recon, images)
                     ssim_map = self._ssim_map(images, recon)
@@ -106,7 +107,7 @@ class CAEModel:
                     for batch in val_loader:
                         images = batch[0] if isinstance(batch, (list, tuple)) else batch
                         images = images.to(self.device)
-                        with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):
+                        with torch.autocast(device_type=self.device.type, enabled=scaler.is_enabled()):
                             recon = self.model(images)
                             mse = F.mse_loss(recon, images)
                             ssim_map = self._ssim_map(images, recon)
@@ -122,24 +123,29 @@ class CAEModel:
         if best_state is not None:
             self.model.load_state_dict(best_state)
 
-    def predict(self, tensor, score_percentile=None):
+    def predict(self, tensor, score_percentile=None, return_raw=False):
         self.model.eval()
         percentile = self.score_percentile if score_percentile is None else float(score_percentile)
-        with torch.inference_mode(), torch.cuda.amp.autocast(enabled=self.device.type == "cuda" and self.config.get("use_amp", True)):
+        with torch.inference_mode(), torch.autocast(
+            device_type=self.device.type, enabled=self.device.type == "cuda" and self.config.get("use_amp", True)
+        ):
             tensor = tensor.to(self.device)
             recon = self.model(tensor)
             mse_map = torch.mean((tensor - recon) ** 2, dim=1, keepdim=True)
-            mse_map = self._normalize_map(mse_map)
             ssim_map = self._ssim_map(tensor, recon)
             anomaly_map = self.config["loss_mse_weight"] * mse_map + self.config["loss_ssim_weight"] * (1.0 - ssim_map)
-            anomaly_map = self._normalize_map(anomaly_map)
         maps = []
+        raw_maps = []
         scores = []
         for amap in anomaly_map:
             amap_np = amap.squeeze(0).detach().cpu().numpy().astype(np.float32)
-            amap_np = np.clip(amap_np, 0.0, 1.0)
-            maps.append(amap_np)
+            raw_maps.append(amap_np)
             scores.append(float(np.quantile(amap_np, percentile)))
+            norm_map = self._normalize_map(amap_np)
+            norm_map = np.clip(norm_map, 0.0, 1.0)
+            maps.append(norm_map)
+        if return_raw:
+            return maps, scores, raw_maps
         return maps, scores
 
     def save(self, path):

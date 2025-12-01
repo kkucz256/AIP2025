@@ -72,8 +72,20 @@ class PaDiMModel:
         self.cov_inv = covariance_inv.to(torch.float32).to(self.device)
         self.channel_indices = self.channel_indices.to(torch.long).to(self.device)
 
-    def predict(self, tensor):
+    def _prepare_kernel(self, kernel):
+        kernel = max(1, int(kernel))
+        if kernel % 2 == 0:
+            kernel += 1
+        return kernel
+
+    def predict(self, tensor, score_percentile=None, return_raw=False, blur_override=None):
         self.extractor.eval()
+        kernel = self.gaussian_kernel
+        sigma = self.blur_sigma
+        if blur_override:
+            kernel = blur_override.get("gaussian_kernel", kernel)
+            sigma = blur_override.get("blur_sigma", sigma)
+        kernel = self._prepare_kernel(kernel)
         with torch.no_grad():
             tensor = tensor.to(self.device)
             outputs = self.extractor(tensor)
@@ -91,15 +103,21 @@ class PaDiMModel:
             dist = dist.unsqueeze(1)
             dist = F.interpolate(dist, size=(self.image_size, self.image_size), mode="bilinear", align_corners=False)
         maps = []
+        raw_maps = []
         scores = []
         for sample in dist:
             amap = sample.squeeze(0).detach().cpu().numpy().astype(np.float32)
-            amap = (amap - amap.min()) / (amap.max() - amap.min() + 1e-6)
-            if self.gaussian_kernel > 1:
-                amap = cv2.GaussianBlur(amap, (self.gaussian_kernel, self.gaussian_kernel), self.blur_sigma)
-            amap = np.clip(amap, 0.0, 1.0)
-            maps.append(amap)
-            scores.append(float(amap.max()))
+            if kernel > 1:
+                amap = cv2.GaussianBlur(amap, (kernel, kernel), sigma)
+            raw_maps.append(amap)
+            percentile = score_percentile
+            score_val = float(np.quantile(amap, percentile)) if percentile is not None else float(amap.max())
+            norm_map = (amap - amap.min()) / (amap.max() - amap.min() + 1e-6)
+            norm_map = np.clip(norm_map, 0.0, 1.0)
+            maps.append(norm_map)
+            scores.append(score_val)
+        if return_raw:
+            return maps, scores, raw_maps
         return maps, scores
 
     def save(self, path):

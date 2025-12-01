@@ -31,7 +31,7 @@ def main():
     set_seed(config.get("seed", 42))
     device = get_device(args.device)
     image_size = config.get("image_size", 256)
-    transform = build_transform(image_size)
+    transform = build_transform(image_size, normalize=args.backend != "cae")
     mask_transform = build_mask_transform(image_size)
     dataset = MVTecADDataset(
         root=resolve_path(config.get("data_dir", "data/mvtec_ad")),

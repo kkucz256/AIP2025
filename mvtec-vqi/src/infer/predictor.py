@@ -17,10 +17,14 @@ class AnomalyPredictor:
         self.category = category
         self.config = config
         self.device = device or get_device()
-        self.transform = build_transform(config.get("image_size", 256))
+        normalize = backend != "cae"
+        self.transform = build_transform(config.get("image_size", 256), normalize=normalize)
+        infer_cfg = config.get("infer", {})
+        backend_cfg = infer_cfg.get("backend_defaults", {}).get(backend, {})
+        self.default_score_percentile = backend_cfg.get("score_percentile", infer_cfg.get("score_percentile"))
         self.model = None
-        self._load_model()
         self._amp_enabled = self._should_enable_amp()
+        self._load_model()
 
     def _should_enable_amp(self):
         infer_cfg = self.config.get("infer", {})
@@ -57,6 +61,7 @@ class AnomalyPredictor:
                 device=self.device,
             )
             model.load(self._artifact_path())
+            model.config["use_amp"] = self._amp_enabled
             self.model = model
         else:
             raise ValueError(f"Nieobsługiwany backend {self.backend}")
@@ -66,40 +71,36 @@ class AnomalyPredictor:
         tensor = self.transform(image).unsqueeze(0)
         return tensor
 
-    def _apply_blur(self, amap, gaussian_kernel=None, blur_sigma=None):
-        kernel = gaussian_kernel if gaussian_kernel is not None else self.config["padim"]["gaussian_kernel"]
-        sigma = blur_sigma if blur_sigma is not None else self.config["padim"]["blur_sigma"]
-        kernel = max(1, int(kernel))
-        if kernel % 2 == 0:
-            kernel += 1
-        amap = cv2.GaussianBlur(amap, (kernel, kernel), sigma)
-        return np.clip(amap, 0.0, 1.0)
-
     def predict_tensor(self, tensor, score_percentile=None, blur_override=None):
-        amp_device = "cuda" if self.device.type == "cuda" else "cpu"
-        with torch.inference_mode(), torch.autocast(device_type=amp_device, enabled=self._amp_enabled and self.backend == "cae"):
-            if self.backend == "padim_resnet50":
-                maps, scores = self.model.predict(tensor.to(self.device))
-            else:
-                maps, scores = self.model.predict(tensor.to(self.device), score_percentile=score_percentile)
-        amap = maps[0]
-        if self.backend == "padim_resnet50" and blur_override:
-            amap = self._apply_blur(
-                amap,
-                gaussian_kernel=blur_override.get("gaussian_kernel"),
-                blur_sigma=blur_override.get("blur_sigma"),
+        effective_percentile = self.default_score_percentile if score_percentile is None else score_percentile
+        if effective_percentile is not None:
+            effective_percentile = float(effective_percentile)
+        if self.backend == "padim_resnet50":
+            maps, scores, raw_maps = self.model.predict(
+                tensor.to(self.device),
+                score_percentile=effective_percentile,
+                return_raw=True,
+                blur_override=blur_override,
             )
+        else:
+            maps, scores, raw_maps = self.model.predict(
+                tensor.to(self.device),
+                score_percentile=effective_percentile,
+                return_raw=True,
+            )
+        amap = maps[0]
+        amap_raw = raw_maps[0]
         array = tensor[0]
-        image = viz.tensor_to_image(array)
+        image = viz.tensor_to_image(array, denormalize=self.backend != "cae")
         resized_map = cv2.resize(amap, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+        resized_raw = cv2.resize(amap_raw, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
         score = float(scores[0])
-        if score_percentile is not None:
-            score = float(np.quantile(resized_map, score_percentile))
         heatmap = viz.map_to_heatmap(resized_map)
         overlay = viz.overlay_heatmap(image, heatmap, 0.5)
         return {
             "score": float(score),
             "anomaly_map": resized_map,
+            "anomaly_map_raw": resized_raw,
             "heatmap": heatmap,
             "overlay": overlay,
         }

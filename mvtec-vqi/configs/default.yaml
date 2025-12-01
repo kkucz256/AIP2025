@@ -11,21 +11,29 @@ padim:
   gaussian_kernel: 5
   blur_sigma: 1.0
 cae:
-  base_channels: 32
-  latent_channels: 256
+  base_channels: 48
+  latent_channels: 384
   learning_rate: 0.001
-  weight_decay: 0.0
+  weight_decay: 0.00001
   batch_size: 16
-  epochs: 30
+  epochs: 50
   use_amp: true
-  loss_mse_weight: 0.85
-  loss_ssim_weight: 0.15
-  score_percentile: 0.9
+  loss_mse_weight: 0.8
+  loss_ssim_weight: 0.2
+  score_percentile: 1.0
+  augment: false
 evaluation:
   percentile_threshold: 0.9
 infer:
-  threshold: 0.55
+  threshold: 11.5
   score_percentile: 0.9
+  backend_defaults:
+    padim_resnet50:
+      threshold: 11.5
+      score_percentile: 0.9
+    cae:
+      threshold: 0.14
+      score_percentile: 1.0
   save_overlay: true
   overlay_dir: reports/overlays_cli
   use_amp: auto

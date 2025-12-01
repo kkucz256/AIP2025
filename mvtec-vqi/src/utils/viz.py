@@ -6,11 +6,12 @@ import numpy as np
 import torch
 
 
-def tensor_to_image(tensor):
+def tensor_to_image(tensor, denormalize=True):
     tensor = tensor.detach().cpu()
-    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-    tensor = tensor * std + mean
+    if denormalize:
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        tensor = tensor * std + mean
     tensor = tensor.clamp(0.0, 1.0)
     array = (tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     return array

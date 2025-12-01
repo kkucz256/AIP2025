@@ -44,22 +44,55 @@ def main():
     set_seed(config.get("seed", 42))
     device = get_device(args.device)
     image_size = config.get("image_size", 256)
-    transform = build_transform(image_size)
-    dataset = MVTecADDataset(
+    augment = bool(config["cae"].get("augment", True))
+    transform_train = build_transform(image_size, normalize=False, augment=augment)
+    transform_eval = build_transform(image_size, normalize=False, augment=False)
+    mask_transform = build_mask_transform(image_size)
+
+    # Zbiór bazowy do wyznaczenia indeksów (bez augmentacji, deterministyczny)
+    base_dataset = MVTecADDataset(
         root=resolve_path(config.get("data_dir", "data/mvtec_ad")),
         category=category,
         split="train",
-        transform=transform,
-        mask_transform=build_mask_transform(image_size),
+        transform=transform_eval,
+        mask_transform=mask_transform,
     )
     splits_path = resolve_path(Path("data") / "splits" / category)
     train_paths, val_paths = load_splits(splits_path)
+
+    def make_datasets():
+        train_dataset = MVTecADDataset(
+            root=resolve_path(config.get("data_dir", "data/mvtec_ad")),
+            category=category,
+            split="train",
+            transform=transform_train,
+            mask_transform=mask_transform,
+        )
+        val_dataset = MVTecADDataset(
+            root=resolve_path(config.get("data_dir", "data/mvtec_ad")),
+            category=category,
+            split="train",
+            transform=transform_eval,
+            mask_transform=mask_transform,
+        )
+        return train_dataset, val_dataset
+
     if train_paths is not None and val_paths is not None:
-        train_subset, val_subset = create_subsets(dataset, train_paths, val_paths)
+        train_indices, val_indices = None, None
+        train_indices, val_indices = create_subsets(base_dataset, train_paths, val_paths)
+        train_dataset, val_dataset = make_datasets()
+        train_subset = Subset(train_dataset, train_indices.indices if isinstance(train_indices, Subset) else train_indices)
+        val_subset = Subset(val_dataset, val_indices.indices if isinstance(val_indices, Subset) else val_indices)
     else:
-        val_size = max(1, int(0.1 * len(dataset)))
-        train_size = len(dataset) - val_size
-        train_subset, val_subset = random_split(dataset, [train_size, val_size])
+        total = len(base_dataset)
+        val_size = max(1, int(0.1 * total))
+        train_size = total - val_size
+        indices = torch.randperm(total)
+        val_indices = indices[:val_size].tolist()
+        train_indices = indices[val_size:].tolist()
+        train_dataset, val_dataset = make_datasets()
+        train_subset = Subset(train_dataset, train_indices)
+        val_subset = Subset(val_dataset, val_indices)
     train_loader = DataLoader(
         train_subset,
         batch_size=config["cae"]["batch_size"],
