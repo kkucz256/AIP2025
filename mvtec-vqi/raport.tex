@@ -1,0 +1,47 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{polski}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Raport Techniczny: Prototyp Systemu Inspekcji Wizualnej}
+\author{Zespół Projektowy}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Założenia Projektowe}
+Celem projektu jest stworzenie prototypu systemu do wizualnej inspekcji jakości. Fundamentem systemu jest model głębokiego uczenia, który potrafi odróżnić produkty wadliwe od poprawnych. W ramach obecnego etapu, skupiamy się na dokończeniu implementacji autoenkodera konwolucyjnego (CAE) i zintegrowaniu go z prostą aplikacją webową, która posłuży jako demonstracja jego możliwości.
+
+\section{Model Detekcji Anomalii: Autoenkoder Konwolucyjny (CAE)}
+Sercem naszego systemu detekcji jest autoenkoder konwolucyjny. Model ten jest trenowany wyłącznie na obrazach produktów bez wad. Jego zadaniem jest nauczenie się efektywnej, skompresowanej reprezentacji danych. Podczas inspekcji, obrazy o wysokim błędzie rekonstrukcji (tj. te, których model nie potrafi poprawnie odtworzyć) są klasyfikowane jako anomalie.
+
+\section{Aplikacja Webowa i Backend}
+Aby umożliwić interakcję z naszym modelem, tworzymy aplikację webową składającą się z backendu i prostego interfejsu użytkownika.
+\begin{itemize}
+    \item \textbf{Backend API:} Zdecydowaliśmy się na stworzenie backendu w oparciu o FastAPI. Udostępni on kluczowy endpoint \texttt{/infer}, który będzie przyjmował obraz w formacie base64, przekazywał go do modelu, a następnie zwracał wynik w postaci wskaźnika anomalii.
+    \item \textbf{Interfejs użytkownika:} Do szybkiej wizualizacji działania modelu wykorzystamy Gradio. Umożliwi to łatwe przesyłanie obrazów i natychmiastowe otrzymywanie wizualnej informacji zwrotnej bez potrzeby budowania złożonego frontendu.
+\end{itemize}
+
+\section{Kluczowe Technologie}
+Wybór technologii został podyktowany szybkością rozwoju i dostępnością narzędzi w ekosystemie.
+\begin{itemize}
+    \item \textbf{Python:} Wszechstronny język z bogatym ekosystemem do uczenia maszynowego i tworzenia aplikacji webowych.
+    \item \textbf{PyTorch:} Elastyczny framework do głębokiego uczenia, idealny do prototypowania i budowy niestandardowych modeli, takich jak nasz autoenkoder.
+    \item \textbf{FastAPI:} Nowoczesny i wydajny framework webowy dla Pythona, który umożliwia szybkie tworzenie API, co jest kluczowe dla naszego backendu.
+    \item \textbf{Gradio:} Biblioteka do szybkiego tworzenia interfejsów użytkownika dla modeli uczenia maszynowego, co pozwala nam na szybką demonstrację działania naszego autoenkodera.
+    \item \textbf{Docker:} Narzędzie do konteneryzacji, które zapewni spójne i odizolowane środowisko uruchomieniowe dla naszej aplikacji, co ułatwi jej wdrożenie.
+\end{itemize}
+
+\section{Kierunki Dalszego Rozwoju}
+Po pomyślnym wdrożeniu obecnej wersji, planujemy rozszerzyć system o następujące elementy:
+\begin{itemize}
+    \item Zintegrowanie alternatywnych, bardziej zaawansowanych modeli detekcji anomalii, takich jak PaDiM, w celu porównania ich wydajności.
+    \item Rozbudowa interfejsu użytkownika o możliwość przeglądania historii inspekcji oraz bardziej szczegółowe wizualizacje.
+    \item Dodanie bazy danych do przechowywania wyników inspekcji i metadanych obrazów.
+    \item Stworzenie modułu do generowania raportów z przeprowadzonych kontroli jakości.
+\end{itemize}
+
+\end{document}
