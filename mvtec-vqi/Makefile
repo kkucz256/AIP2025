@@ -23,4 +23,4 @@ eval:
 	python -m src.eval.evaluate --backend $(BACKEND) --category $(CATEGORY) --config $(CONFIG)
 
 app:
-	python -m src.app.ui_gradio --config $(CONFIG)
+	python -m src.app.cli --config $(CONFIG)

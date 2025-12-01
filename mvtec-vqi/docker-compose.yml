@@ -1,9 +1,8 @@
 services:
   app:
     build: .
-    ports:
-      - "7860:7860"
-      - "8000:8000"
+    stdin_open: true
+    tty: true
     volumes:
       - ./data:/app/data
       - ./artifacts:/app/artifacts
@@ -11,4 +10,4 @@ services:
       - ./configs:/app/configs
     environment:
       - MVTEC_CONFIG=configs/default.yaml
-    command: python -m src.app.ui_gradio --config ${MVTEC_CONFIG}
+    command: python -m src.app.cli --config ${MVTEC_CONFIG}

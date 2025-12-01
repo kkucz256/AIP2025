@@ -5,5 +5,4 @@ WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 COPY . .
-EXPOSE 7860 8000
-CMD ["python", "-m", "src.app.ui_gradio", "--config", "configs/default.yaml"]
+CMD ["python", "-m", "src.app.cli", "--config", "configs/default.yaml"]

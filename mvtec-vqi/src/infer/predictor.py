@@ -20,6 +20,15 @@ class AnomalyPredictor:
         self.transform = build_transform(config.get("image_size", 256))
         self.model = None
         self._load_model()
+        self._amp_enabled = self._should_enable_amp()
+
+    def _should_enable_amp(self):
+        infer_cfg = self.config.get("infer", {})
+        value = infer_cfg.get("use_amp", "auto")
+        if isinstance(value, str) and value.lower() == "auto":
+            return self.device.type == "cuda"
+        enabled = bool(value)
+        return enabled and self.device.type in {"cuda", "cpu"}
 
     def _artifact_path(self):
         artifacts_root = resolve_path(self.config.get("artifacts_dir", "artifacts"))
@@ -57,17 +66,35 @@ class AnomalyPredictor:
         tensor = self.transform(image).unsqueeze(0)
         return tensor
 
-    def predict_tensor(self, tensor):
-        with torch.no_grad():
+    def _apply_blur(self, amap, gaussian_kernel=None, blur_sigma=None):
+        kernel = gaussian_kernel if gaussian_kernel is not None else self.config["padim"]["gaussian_kernel"]
+        sigma = blur_sigma if blur_sigma is not None else self.config["padim"]["blur_sigma"]
+        kernel = max(1, int(kernel))
+        if kernel % 2 == 0:
+            kernel += 1
+        amap = cv2.GaussianBlur(amap, (kernel, kernel), sigma)
+        return np.clip(amap, 0.0, 1.0)
+
+    def predict_tensor(self, tensor, score_percentile=None, blur_override=None):
+        amp_device = "cuda" if self.device.type == "cuda" else "cpu"
+        with torch.inference_mode(), torch.autocast(device_type=amp_device, enabled=self._amp_enabled and self.backend == "cae"):
             if self.backend == "padim_resnet50":
                 maps, scores = self.model.predict(tensor.to(self.device))
             else:
-                maps, scores = self.model.predict(tensor.to(self.device))
+                maps, scores = self.model.predict(tensor.to(self.device), score_percentile=score_percentile)
         amap = maps[0]
-        score = scores[0]
+        if self.backend == "padim_resnet50" and blur_override:
+            amap = self._apply_blur(
+                amap,
+                gaussian_kernel=blur_override.get("gaussian_kernel"),
+                blur_sigma=blur_override.get("blur_sigma"),
+            )
         array = tensor[0]
         image = viz.tensor_to_image(array)
         resized_map = cv2.resize(amap, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+        score = float(scores[0])
+        if score_percentile is not None:
+            score = float(np.quantile(resized_map, score_percentile))
         heatmap = viz.map_to_heatmap(resized_map)
         overlay = viz.overlay_heatmap(image, heatmap, 0.5)
         return {
@@ -77,7 +104,7 @@ class AnomalyPredictor:
             "overlay": overlay,
         }
 
-    def predict_array(self, array):
+    def predict_array(self, array, score_percentile=None, blur_override=None):
         tensor = self.preprocess_array(array)
-        result = self.predict_tensor(tensor)
+        result = self.predict_tensor(tensor, score_percentile=score_percentile, blur_override=blur_override)
         return result

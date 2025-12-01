@@ -47,6 +47,7 @@ class CAEModel:
         self.image_size = image_size
         self.config = dict(config)
         self.device = device
+        self.score_percentile = float(self.config.get("score_percentile", 0.9))
         self.model = ConvAutoencoder(self.config["base_channels"], self.config["latent_channels"]).to(device)
 
     def _ssim_map(self, x, y):
@@ -71,6 +72,7 @@ class CAEModel:
         return (amap - min_val) / (max_val - min_val + 1e-8)
 
     def fit(self, train_loader, val_loader=None, epochs=30):
+        scaler = torch.cuda.amp.GradScaler(enabled=self.device.type == "cuda" and self.config.get("use_amp", True))
         optimizer = Adam(self.model.parameters(), lr=self.config["learning_rate"], weight_decay=self.config["weight_decay"])
         best_loss = float("inf")
         best_state = None
@@ -81,13 +83,19 @@ class CAEModel:
                 images = batch[0] if isinstance(batch, (list, tuple)) else batch
                 images = images.to(self.device)
                 optimizer.zero_grad()
-                recon = self.model(images)
-                mse = F.mse_loss(recon, images)
-                ssim_map = self._ssim_map(images, recon)
-                ssim_loss = 1.0 - ssim_map.mean()
-                loss = self.config["loss_mse_weight"] * mse + self.config["loss_ssim_weight"] * ssim_loss
-                loss.backward()
-                optimizer.step()
+                with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):
+                    recon = self.model(images)
+                    mse = F.mse_loss(recon, images)
+                    ssim_map = self._ssim_map(images, recon)
+                    ssim_loss = 1.0 - ssim_map.mean()
+                    loss = self.config["loss_mse_weight"] * mse + self.config["loss_ssim_weight"] * ssim_loss
+                if scaler.is_enabled():
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    optimizer.step()
                 running += loss.item() * images.size(0)
             train_loss = running / len(train_loader.dataset)
             val_loss = train_loss
@@ -98,11 +106,12 @@ class CAEModel:
                     for batch in val_loader:
                         images = batch[0] if isinstance(batch, (list, tuple)) else batch
                         images = images.to(self.device)
-                        recon = self.model(images)
-                        mse = F.mse_loss(recon, images)
-                        ssim_map = self._ssim_map(images, recon)
-                        ssim_loss = 1.0 - ssim_map.mean()
-                        value = self.config["loss_mse_weight"] * mse + self.config["loss_ssim_weight"] * ssim_loss
+                        with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):
+                            recon = self.model(images)
+                            mse = F.mse_loss(recon, images)
+                            ssim_map = self._ssim_map(images, recon)
+                            ssim_loss = 1.0 - ssim_map.mean()
+                            value = self.config["loss_mse_weight"] * mse + self.config["loss_ssim_weight"] * ssim_loss
                         total += value.item() * images.size(0)
                 val_loss = total / len(val_loader.dataset)
             print(f"Epoch {epoch + 1}: train_loss={train_loss:.6f} val_loss={val_loss:.6f}")
@@ -113,9 +122,10 @@ class CAEModel:
         if best_state is not None:
             self.model.load_state_dict(best_state)
 
-    def predict(self, tensor):
+    def predict(self, tensor, score_percentile=None):
         self.model.eval()
-        with torch.no_grad():
+        percentile = self.score_percentile if score_percentile is None else float(score_percentile)
+        with torch.inference_mode(), torch.cuda.amp.autocast(enabled=self.device.type == "cuda" and self.config.get("use_amp", True)):
             tensor = tensor.to(self.device)
             recon = self.model(tensor)
             mse_map = torch.mean((tensor - recon) ** 2, dim=1, keepdim=True)
@@ -129,14 +139,16 @@ class CAEModel:
             amap_np = amap.squeeze(0).detach().cpu().numpy().astype(np.float32)
             amap_np = np.clip(amap_np, 0.0, 1.0)
             maps.append(amap_np)
-            scores.append(float(np.quantile(amap_np, 0.9)))
+            scores.append(float(np.quantile(amap_np, percentile)))
         return maps, scores
 
     def save(self, path):
+        self.config["score_percentile"] = self.score_percentile
         state = {
             "model": self.model.state_dict(),
             "config": self.config,
             "image_size": self.image_size,
+            "score_percentile": self.score_percentile,
         }
         torch.save(state, path)
 
@@ -146,5 +158,6 @@ class CAEModel:
         if "config" in state:
             self.config.update(state["config"])
         self.image_size = state.get("image_size", self.image_size)
+        self.score_percentile = float(state.get("score_percentile", self.config.get("score_percentile", 0.9)))
         self.model.to(self.device)
         self.model.eval()
