@@ -128,6 +128,7 @@ class CAEModel:
             self.model.load_state_dict(best_state)
 
     def predict(self, tensor, score_percentile=None, return_raw=False):
+        #test
         self.model.eval()
         percentile = self.score_percentile if score_percentile is None else float(score_percentile)
         with torch.inference_mode(), torch.autocast(
