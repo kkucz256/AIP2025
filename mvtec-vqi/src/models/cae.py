@@ -128,7 +128,6 @@ class CAEModel:
             self.model.load_state_dict(best_state)
 
     def predict(self, tensor, score_percentile=None, return_raw=False):
-        #test
         self.model.eval()
         percentile = self.score_percentile if score_percentile is None else float(score_percentile)
         with torch.inference_mode(), torch.autocast(
@@ -144,13 +143,19 @@ class CAEModel:
         scores = []
         for amap in anomaly_map:
             amap_np = amap.squeeze(0).detach().cpu().numpy().astype(np.float32)
-            margin = 16
             h, w = amap_np.shape
-            if margin > 0 and h > 2*margin and w > 2*margin:
-                amap_np[:margin, :] = 0
-                amap_np[h-margin:, :] = 0
-                amap_np[:, :margin] = 0
-                amap_np[:, w-margin:] = 0
+            center_y, center_x = h // 2, w // 2
+            
+            y_grid, x_grid = np.indices((h, w))
+            
+            dist_from_center = np.sqrt((x_grid - center_x)**2 + (y_grid - center_y)**2)
+            
+            radius_factor = 0.95
+            max_radius = min(h, w) // 2
+            cutoff_radius = max_radius * radius_factor
+            
+            circular_mask = dist_from_center < cutoff_radius
+            amap_np = amap_np * circular_mask
 
             raw_maps.append(amap_np)
             scores.append(float(np.quantile(amap_np, percentile)))

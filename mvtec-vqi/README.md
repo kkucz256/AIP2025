@@ -8,6 +8,7 @@ Upewnij się, że masz zainstalowane wszystkie zależności z `requirements.txt`
 ```bash
 pip install -r requirements.txt
 ```
+Oraz dataset (https://www.kaggle.com/datasets/ipythonx/mvtec-ad?resource=download) umieszczony w folderze `data/mvtec_ad`
 
 ### Trening modeli
 

@@ -16,7 +16,7 @@ cae:
   learning_rate: 0.001
   weight_decay: 0.00001
   batch_size: 16
-  epochs: 50
+  epochs: 300
   use_amp: true
   loss_mse_weight: 0.8
   loss_ssim_weight: 0.2
