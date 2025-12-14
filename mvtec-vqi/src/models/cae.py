@@ -9,19 +9,23 @@ from tqdm import tqdm
 class ConvAutoencoder(nn.Module):
     def __init__(self, base_channels, latent_channels):
         super().__init__()
+        
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, base_channels, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(3, base_channels, 3, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(base_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(base_channels, base_channels * 2, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            
+            nn.Conv2d(base_channels, base_channels * 2, 3, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(base_channels * 2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            
+            nn.Conv2d(base_channels * 2, base_channels * 4, 3, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(base_channels * 4),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(base_channels * 4, latent_channels, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            
+            nn.Conv2d(base_channels * 4, latent_channels, 3, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(latent_channels),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
         )
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(latent_channels, base_channels * 4, kernel_size=4, stride=2, padding=1),
@@ -139,6 +143,14 @@ class CAEModel:
         scores = []
         for amap in anomaly_map:
             amap_np = amap.squeeze(0).detach().cpu().numpy().astype(np.float32)
+            margin = 16
+            h, w = amap_np.shape
+            if margin > 0 and h > 2*margin and w > 2*margin:
+                amap_np[:margin, :] = 0
+                amap_np[h-margin:, :] = 0
+                amap_np[:, :margin] = 0
+                amap_np[:, w-margin:] = 0
+
             raw_maps.append(amap_np)
             scores.append(float(np.quantile(amap_np, percentile)))
             norm_map = self._normalize_map(amap_np)

@@ -1,1 +1,0 @@
-Umieść dane MVTec AD po pobraniu skryptem `scripts/download_mvtec.py` w katalogu `data/mvtec_ad`. Struktura powinna odpowiadać oryginalnemu układowi zbioru (`category/train/good`, `category/test/<defekt>`, `category/ground_truth/<defekt>`). Pliki splitów trening/validation są zapisywane w `data/splits/<category>`.

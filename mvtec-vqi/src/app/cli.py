@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 import cv2
@@ -31,11 +32,24 @@ class PredictorCache:
         self.config = config
         self._cache: Dict[Tuple[str, str, str], AnomalyPredictor] = {}
 
-    def get(self, backend: str, category: str, device, config_override=None) -> AnomalyPredictor:
+    def get(self, backend: str, category: str, device, weights_path: Path = None, config_override=None) -> AnomalyPredictor:
         key = (backend, category, str(device))
         if key not in self._cache:
             cfg = config_override or self.config
-            self._cache[key] = AnomalyPredictor(backend=backend, category=category, config=cfg, device=device)
+            predictor = AnomalyPredictor(backend=backend, category=category, config=cfg, device=device)
+            
+            if weights_path and weights_path.exists():
+                print(f"DEBUG: Ladowanie wag z {weights_path}")
+                if hasattr(predictor, "model") and hasattr(predictor.model, "load"):
+                     predictor.model.load(str(weights_path))
+                elif hasattr(predictor, "load"):
+                     predictor.load(str(weights_path))
+                else:
+                    print("ERROR: Predictor nie ma metody load!")
+            else:
+                print(f"WARNING: Nie znaleziono wag w {weights_path}! Uzywam losowego modelu (bez sensu).")
+            
+            self._cache[key] = predictor
         return self._cache[key]
 
     def clear(self):
@@ -316,14 +330,20 @@ class TerminalApp:
         return np.array(image)
 
     def _save_visuals(self, overlay, heatmap, source_path: Path):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_name = self.state["backend"]
+        source_name = source_path.stem
+        
         if not self.common_params["save_overlay"]:
             return None, None
         out_dir = Path(self.common_params["overlay_dir"])
         out_dir.mkdir(parents=True, exist_ok=True)
-        overlay_path = out_dir / "overlay.png"
-        heatmap_path = out_dir / "heatmap.png"
+        filename_base = f"{timestamp}_{model_name}_{source_name}"
+        overlay_path = out_dir / f"{filename_base}_overlay.png"
+        heatmap_path = out_dir / f"{filename_base}_heatmap.png"
         cv2.imwrite(str(overlay_path), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
         cv2.imwrite(str(heatmap_path), cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR))
+        
         return overlay_path, heatmap_path
 
     def run_inference(self):
@@ -333,9 +353,13 @@ class TerminalApp:
         backend = self.state["backend"]
         category = self.state["category"]
         params = self.backend_params[backend]
+        project_root = Path.cwd()
+        weights_path = project_root / "artifacts" / backend / category / "model.pt"
         try:
-            predictor = self.cache.get(backend, category, self.device)
+            predictor = self.cache.get(backend, category, self.device, weights_path=weights_path)
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             input(f"Nie udalo sie zaladowac modelu ({exc}). Enter aby wrocic.")
             return
         try:
