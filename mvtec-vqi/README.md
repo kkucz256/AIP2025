@@ -22,6 +22,10 @@ Oraz dataset (https://www.kaggle.com/datasets/ipythonx/mvtec-ad?resource=downloa
     ```
 Wytrenowane modele zapisywane są w katalogu `artifacts/`.
 
+### Metryki modeli
+    python3 -m src.eval.evaluate --backend cae --category bottle
+    
+
 ### Uruchomienie trybu terminalowego
 
 Aby uruchomić interaktywną aplikację w terminalu:
