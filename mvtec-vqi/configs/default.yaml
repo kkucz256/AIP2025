@@ -16,12 +16,12 @@ cae:
   learning_rate: 0.001
   weight_decay: 0.00001
   batch_size: 16
-  epochs: 300
+  epochs: 500
   use_amp: true
-  loss_mse_weight: 0.8
-  loss_ssim_weight: 0.2
+  loss_mse_weight: 0.5
+  loss_ssim_weight: 0.5
   score_percentile: 1.0
-  augment: false
+  augment: true
 evaluation:
   percentile_threshold: 0.9
 infer:
