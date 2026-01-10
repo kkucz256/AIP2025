@@ -16,9 +16,9 @@ Oraz dataset (https://www.kaggle.com/datasets/ipythonx/mvtec-ad?resource=downloa
     ```bash
     python3 -m src.train.fit_padim --category bottle --config configs/default.yaml
     ```
-*   **CAE** (np. 30 epok):
+*   **CAE**:
     ```bash
-    python3 -m src.train.train_cae --category bottle --epochs 30 --config configs/default.yaml
+    python3 -m src.train.train_cae --category bottle --config configs/default.yaml
     ```
 Wytrenowane modele zapisywane są w katalogu `artifacts/`.
 

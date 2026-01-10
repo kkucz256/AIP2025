@@ -1,9 +1,9 @@
 {
   "backend": "cae",
   "category": "bottle",
-  "image_auroc": 0.8738095238095238,
-  "pixel_auroc": 0.835480605831478,
-  "dice_otsu": 0.26487431077482143,
-  "dice_percent": 0.26277075408659245,
+  "image_auroc": 0.45476190476190476,
+  "pixel_auroc": 0.8040279429104791,
+  "dice_otsu": 0.19711525320910214,
+  "dice_percent": 0.18694536107469323,
   "threshold_percentile": 0.9
 }
