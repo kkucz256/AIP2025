@@ -16,7 +16,12 @@ def build_transform(image_size, normalize=True, augment=False):
     if augment:
         ops.extend(
             [
-                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.02),
+                # Symulacja zmian oswietlenia (balans bieli, jasnosc) - agresywniejsza dla kamer
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
+                # Symulacja niedokladnego pozycjonowania obiektu na tasmie
+                transforms.RandomAffine(degrees=5, translate=(0.05, 0.05), scale=(0.95, 1.05)),
+                # Symulacja nieostrosci (motion blur / zly focus)
+                transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=0.2),
                 transforms.RandomHorizontalFlip(p=0.5),
             ]
         )
