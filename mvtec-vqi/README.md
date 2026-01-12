@@ -33,3 +33,14 @@ Aby uruchomić interaktywną aplikację w terminalu:
 python3 -m src.app.cli --config configs/default.yaml
 ```
 Aplikacja pozwala na wybór modelu, obrazu, konfigurację parametrów analizy oraz uruchomienie inspekcji.
+
+### Benchmark i Raportowanie
+
+Aby przeprowadzić automatyczne testy sprawności modeli i wygenerować raport HTML z wykresami:
+```bash
+python scripts/run_benchmark.py --categories bottle --backends padim_resnet50 cae
+```
+Dostępne opcje:
+*   `--categories`: lista kategorii (np. bottle cable). Domyślnie wszystkie znalezione.
+*   `--backends`: lista modeli (np. padim_resnet50 cae padim_wide_resnet50_2). Domyślnie sprawdza popularne modele.
+*   `--output-dir`: katalog na raport (domyślnie `reports/benchmark`).
