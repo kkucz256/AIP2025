@@ -2,12 +2,16 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import (
+    resnet50, ResNet50_Weights,
+    wide_resnet50_2, Wide_ResNet50_2_Weights,
+    efficientnet_b4, EfficientNet_B4_Weights
+)
 from torchvision.models.feature_extraction import create_feature_extractor
 
 
 class PaDiMModel:
-    def __init__(self, image_size, selected_channels, gaussian_kernel, blur_sigma, device, seed=42):
+    def __init__(self, image_size, selected_channels, gaussian_kernel, blur_sigma, device, backbone="resnet50", seed=42):
         self.device = device
         self.image_size = image_size
         self.selected_channels = selected_channels
@@ -16,18 +20,28 @@ class PaDiMModel:
             self.gaussian_kernel += 1
         self.blur_sigma = blur_sigma
         self.seed = seed
-        base = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+        self.backbone_name = backbone
+
+        if backbone == "wide_resnet50_2":
+            base = wide_resnet50_2(weights=Wide_ResNet50_2_Weights.IMAGENET1K_V1)
+            return_nodes = {"layer1": "layer1", "layer2": "layer2", "layer3": "layer3"}
+        elif backbone == "efficientnet_b4":
+            base = efficientnet_b4(weights=EfficientNet_B4_Weights.IMAGENET1K_V1)
+            # EfficientNet B4 structure:
+            # features.4 -> reduction 8
+            # features.6 -> reduction 16
+            # features.8 -> reduction 32
+            return_nodes = {"features.4": "layer1", "features.6": "layer2", "features.8": "layer3"}
+        else: # Default to resnet50
+            base = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+            return_nodes = {"layer1": "layer1", "layer2": "layer2", "layer3": "layer3"}
+
         base.eval()
         for param in base.parameters():
             param.requires_grad_(False)
-        self.extractor = create_feature_extractor(
-            base,
-            return_nodes={
-                "layer1": "layer1",
-                "layer2": "layer2",
-                "layer3": "layer3",
-            },
-        ).to(self.device)
+        
+        self.extractor = create_feature_extractor(base, return_nodes=return_nodes).to(self.device)
+        
         self.mean = None
         self.cov_inv = None
         self.channel_indices = None
@@ -131,6 +145,7 @@ class PaDiMModel:
             "gaussian_kernel": self.gaussian_kernel,
             "blur_sigma": self.blur_sigma,
             "seed": self.seed,
+            "backbone": self.backbone_name,
         }
         torch.save(state, path)
 
@@ -145,4 +160,11 @@ class PaDiMModel:
         self.gaussian_kernel = state["gaussian_kernel"]
         self.blur_sigma = state["blur_sigma"]
         self.seed = state.get("seed", self.seed)
+        
+        # Check if backbone matches or if we need to reload
+        saved_backbone = state.get("backbone", "resnet50")
+        if saved_backbone != self.backbone_name:
+             print(f"Warning: Loading model with backbone {saved_backbone} into {self.backbone_name}. Re-initializing might be needed if architecture differs.")
+             # In a full impl, we might want to re-init here, but for now assuming user manages it or we reload
+        
         self.extractor.eval()

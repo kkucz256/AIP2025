@@ -1,0 +1,9 @@
+{
+  "backend": "padim_efficientnet_b4",
+  "category": "bottle",
+  "image_auroc": 1.0,
+  "pixel_auroc": 0.8742095370501857,
+  "dice_otsu": 0.33646285592251607,
+  "dice_percent": 0.15984132680951402,
+  "threshold_percentile": 0.99
+}

@@ -43,7 +43,11 @@ class AnomalyPredictor:
         return path
 
     def _load_model(self):
-        if self.backend == "padim_resnet50":
+        if self.backend.startswith("padim"):
+            # Extract backbone from backend name (e.g., padim_resnet50 -> resnet50)
+            parts = self.backend.split("_", 1)
+            backbone = parts[1] if len(parts) > 1 else "resnet50"
+            
             model = PaDiMModel(
                 image_size=self.config.get("image_size", 256),
                 selected_channels=self.config["padim"]["selected_channels"],
@@ -51,6 +55,7 @@ class AnomalyPredictor:
                 blur_sigma=self.config["padim"]["blur_sigma"],
                 device=self.device,
                 seed=self.config.get("seed", 42),
+                backbone=backbone,
             )
             model.load(self._artifact_path())
             self.model = model
@@ -75,7 +80,7 @@ class AnomalyPredictor:
         effective_percentile = self.default_score_percentile if score_percentile is None else score_percentile
         if effective_percentile is not None:
             effective_percentile = float(effective_percentile)
-        if self.backend == "padim_resnet50":
+        if self.backend.startswith("padim"):
             maps, scores, raw_maps = self.model.predict(
                 tensor.to(self.device),
                 score_percentile=effective_percentile,

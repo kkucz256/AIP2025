@@ -45,7 +45,8 @@ def main():
     device = get_device(args.device)
     image_size = config.get("image_size", 256)
     augment = bool(config["cae"].get("augment", True))
-    transform_train = build_transform(image_size, normalize=False, augment=augment)
+    rotation = config.get("rotation", 0)
+    transform_train = build_transform(image_size, normalize=False, augment=augment, rotation=rotation)
     transform_eval = build_transform(image_size, normalize=False, augment=False)
     mask_transform = build_mask_transform(image_size)
 

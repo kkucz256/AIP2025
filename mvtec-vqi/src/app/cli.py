@@ -71,6 +71,7 @@ class TerminalApp:
         }
         self.backend_params: Dict[str, Dict[str, float]] = {
             "padim_resnet50": self._backend_defaults("padim_resnet50"),
+            "padim_wide_resnet50_2": self._backend_defaults("padim_wide_resnet50_2"),
             "cae": self._backend_defaults("cae"),
         }
         self.common_params = {
@@ -87,7 +88,7 @@ class TerminalApp:
             "threshold": float(threshold),
             "score_percentile": float(percentile),
         }
-        if backend == "padim_resnet50":
+        if backend.startswith("padim"):
             params["gaussian_kernel"] = self.config["padim"]["gaussian_kernel"]
             params["blur_sigma"] = self.config["padim"]["blur_sigma"]
         return params
@@ -129,8 +130,9 @@ class TerminalApp:
 
     def choose_model(self):
         options = [
-            ("PaDiM (ResNet50) - szybki, statystyczny", "padim_resnet50"),
-            ("CAE (autoenkoder) - dokladniejszy, wolniejszy", "cae"),
+            ("PaDiM (Wide ResNet50) - zalecany, najdokładniejszy", "padim_wide_resnet50_2"),
+            ("PaDiM (ResNet50) - szybki", "padim_resnet50"),
+            ("CAE (autoenkoder) - rekonstrukcyjny", "cae"),
             ("Instrukcje modeli", "__help__"),
             ("Cofnij", "__back__"),
         ]
@@ -262,7 +264,7 @@ class TerminalApp:
                 (f"Prog klasyfikacji (aktualnie {params['threshold']:.2f})", "threshold"),
                 (f"Percentyl mapy anomalii (aktualnie {params['score_percentile']:.2f})", "percentile"),
             ]
-            if self.state["backend"] == "padim_resnet50":
+            if self.state["backend"].startswith("padim"):
                 options.append(
                     (f"Wygladzanie PaDiM kernel={params['gaussian_kernel']} sigma={params['blur_sigma']}", "smoothing")
                 )
@@ -285,7 +287,7 @@ class TerminalApp:
             elif selection == "percentile":
                 value = prompt_float("Percentyl do obliczenia wyniku (0-1)", params["score_percentile"])
                 params["score_percentile"] = min(max(value, 0.0), 1.0)
-            elif selection == "smoothing" and self.state["backend"] == "padim_resnet50":
+            elif selection == "smoothing" and self.state["backend"].startswith("padim"):
                 params["gaussian_kernel"] = int(
                     prompt_float("Rozmiar jadra Gaussa dla PaDiM (nieparzyste)", params["gaussian_kernel"])
                 )
@@ -368,7 +370,7 @@ class TerminalApp:
             input("Wybrane zdjecie nie istnieje. Enter aby wrocic.")
             return
         blur_override = None
-        if backend == "padim_resnet50":
+        if backend.startswith("padim"):
             blur_override = {
                 "gaussian_kernel": params["gaussian_kernel"],
                 "blur_sigma": params["blur_sigma"],

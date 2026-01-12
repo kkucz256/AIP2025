@@ -1,0 +1,112 @@
+[
+  {
+    "model": "padim",
+    "backbone": "resnet50",
+    "metrics": {
+      "backend": "padim_resnet50",
+      "category": "bottle",
+      "image_auroc": 0.9936507936507937,
+      "pixel_auroc": 0.954509741685529,
+      "dice_otsu": 0.4939052302440605,
+      "dice_percent": 0.23587485929348928,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.9481605353363227
+  },
+  {
+    "model": "padim",
+    "backbone": "wide_resnet50_2",
+    "metrics": {
+      "backend": "padim_wide_resnet50_2",
+      "category": "bottle",
+      "image_auroc": 1.0,
+      "pixel_auroc": 0.9686198385542802,
+      "dice_otsu": 0.34663494077386187,
+      "dice_percent": 0.23142969064028615,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.9686198385542801
+  },
+  {
+    "model": "padim",
+    "backbone": "efficientnet_b4",
+    "metrics": {
+      "backend": "padim_efficientnet_b4",
+      "category": "bottle",
+      "image_auroc": 1.0,
+      "pixel_auroc": 0.8742095370501857,
+      "dice_otsu": 0.33646285592251607,
+      "dice_percent": 0.15984132680951402,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.8742095370501857
+  },
+  {
+    "model": "cae",
+    "config": {
+      "latent_channels": 128,
+      "rotation": 5
+    },
+    "metrics": {
+      "backend": "cae",
+      "category": "bottle",
+      "image_auroc": 0.9396825396825397,
+      "pixel_auroc": 0.8686760903606123,
+      "dice_otsu": 0.26463583898606063,
+      "dice_percent": 0.15403989358335454,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.808358630043152
+  },
+  {
+    "model": "cae",
+    "config": {
+      "latent_channels": 256,
+      "rotation": 5
+    },
+    "metrics": {
+      "backend": "cae",
+      "category": "bottle",
+      "image_auroc": 0.9301587301587301,
+      "pixel_auroc": 0.8693229067651782,
+      "dice_otsu": 0.26590709271277413,
+      "dice_percent": 0.1470599142315193,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.7994816369239084
+  },
+  {
+    "model": "cae",
+    "config": {
+      "latent_channels": 256,
+      "rotation": 15
+    },
+    "metrics": {
+      "backend": "cae",
+      "category": "bottle",
+      "image_auroc": 0.9293650793650793,
+      "pixel_auroc": 0.8558847585641487,
+      "dice_otsu": 0.25828651001375963,
+      "dice_percent": 0.14955575436795815,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.785249837929228
+  },
+  {
+    "model": "cae",
+    "config": {
+      "latent_channels": 512,
+      "rotation": 5
+    },
+    "metrics": {
+      "backend": "cae",
+      "category": "bottle",
+      "image_auroc": 0.915873015873016,
+      "pixel_auroc": 0.853634390563908,
+      "dice_otsu": 0.25319749875111114,
+      "dice_percent": 0.15124720104907194,
+      "threshold_percentile": 0.99
+    },
+    "score": 1.769507406436924
+  }
+]

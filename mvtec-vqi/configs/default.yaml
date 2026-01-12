@@ -9,15 +9,17 @@ image_size: 256
 
 batch_size: 32
 num_workers: 4
+rotation: 5
 
 padim:
   selected_channels: 150
   gaussian_kernel: 7
   blur_sigma: 1.5
+  backbone: wide_resnet50_2
 
 cae:
   base_channels: 64
-  latent_channels: 256
+  latent_channels: 128
 
   learning_rate: 0.0002
   weight_decay: 0.000001
@@ -42,11 +44,15 @@ infer:
 
   backend_defaults:
     padim_resnet50:
-      threshold: 11.5
-      score_percentile: 0.95
+      threshold: 10.0
+      score_percentile: 0.999
+
+    padim_wide_resnet50_2:
+      threshold: 10.0
+      score_percentile: 0.999
 
     cae:
-      threshold: 0.0
+      threshold: 0.65
       score_percentile: 0.995
 
   save_overlay: true
